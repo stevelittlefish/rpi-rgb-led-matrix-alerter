@@ -4,3 +4,5 @@
 *.so
 .envrc
 .direnv
+*.swp
+__pycache__
