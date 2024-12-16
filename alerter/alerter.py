@@ -15,23 +15,25 @@ MOTD_COLOUR = graphics.Color(0, 0, 50)
 ALERT_COLOUR = graphics.Color(255, 0, 0)
 
 
-motd = "Loading..."
+next_motd = "Loading..."
+motd = next_motd
+daddy_is_sleeping = False
 alert = None
 
 motd_pos = 0
 
 
 def get_messages():
-    global alert, motd
+    global alert, next_motd
 
     print("Fetching messages")
 
     r = requests.get(FETCH_ENDPOINT)
     if r.status_code != 200:
-        motd = f"ERROR {r.status_code}"
+        next_motd = f"ERROR {r.status_code}"
     else:
         response = r.json()
-        motd = response["motd"]
+        next_motd = response["motd"]
         alert = response["alert"]
 
 
@@ -41,15 +43,16 @@ class RunText(SampleBase):
         self.parser.add_argument("-t", "--text", help="The text to scroll on the RGB LED panel", default="Hello world!")
 
     def run(self):
-        global motd_pos
+        global motd_pos, motd
 
         offscreen_canvas = self.matrix.CreateFrameCanvas()
 
         time_font = graphics.Font()
-        time_font.LoadFont("../fonts/6x10.bdf")
+        time_font.LoadFont("../fonts/7x13.bdf")
 
         font = graphics.Font()
-        font.LoadFont("../fonts/8x13.bdf")
+        # font.LoadFont("../fonts/clR6x12.bdf")
+        font.LoadFont("../fonts/7x13.bdf")
         motd_pos = offscreen_canvas.width
         my_text = self.args.text
 
@@ -68,12 +71,13 @@ class RunText(SampleBase):
 
             time_str = now.strftime("%H:%M:%S")
 
-            graphics.DrawText(offscreen_canvas, time_font, 9, 8, CLOCK_COLOUR, time_str)
+            graphics.DrawText(offscreen_canvas, time_font, 4, 11, CLOCK_COLOUR, time_str)
 
             len = graphics.DrawText(offscreen_canvas, font, motd_pos, 27, MOTD_COLOUR, motd) + 50
             motd_pos -= 1
             if (motd_pos + len < 0):
                 motd_pos = offscreen_canvas.width
+                motd = next_motd
 
             time.sleep(0.05)
             offscreen_canvas = self.matrix.SwapOnVSync(offscreen_canvas)
