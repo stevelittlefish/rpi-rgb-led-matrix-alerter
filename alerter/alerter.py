@@ -21,6 +21,7 @@ daddy_is_sleeping = False
 alert = None
 
 motd_pos = 0
+alert_pos = 0
 
 
 def get_messages():
@@ -43,7 +44,7 @@ class RunText(SampleBase):
         self.parser.add_argument("-t", "--text", help="The text to scroll on the RGB LED panel", default="Hello world!")
 
     def run(self):
-        global motd_pos, motd
+        global motd_pos, motd, alert_pos
 
         offscreen_canvas = self.matrix.CreateFrameCanvas()
 
@@ -54,7 +55,10 @@ class RunText(SampleBase):
         # font.LoadFont("../fonts/clR6x12.bdf")
         font.LoadFont("../fonts/7x13.bdf")
         motd_pos = offscreen_canvas.width
-        my_text = self.args.text
+        
+        alert_font = graphics.Font()
+        alert_font.LoadFont("../fonts/7x13B.bdf")
+        alert_pos = offscreen_canvas.width
 
         next_fetch = 0
 
@@ -69,15 +73,28 @@ class RunText(SampleBase):
 
                 get_messages()
 
-            time_str = now.strftime("%H:%M:%S")
+            if alert:
+                if (int(unix_time) % 2) == 0:
+                    graphics.DrawLine(offscreen_canvas, 0, 0, offscreen_canvas.width, 0, ALERT_COLOUR)
+                    graphics.DrawLine(offscreen_canvas, 0, 1, offscreen_canvas.width, 1, ALERT_COLOUR)
+                    graphics.DrawLine(offscreen_canvas, 0, offscreen_canvas.height - 2, offscreen_canvas.width, offscreen_canvas.height - 2, ALERT_COLOUR)
+                    graphics.DrawLine(offscreen_canvas, 0, offscreen_canvas.height - 1, offscreen_canvas.width, offscreen_canvas.height - 1, ALERT_COLOUR)
 
-            graphics.DrawText(offscreen_canvas, time_font, 4, 11, CLOCK_COLOUR, time_str)
+                len = graphics.DrawText(offscreen_canvas, alert_font, alert_pos, 20, ALERT_COLOUR, alert)
+                alert_pos -= 1
+                if (alert_pos + len < 0):
+                    alert_pos = offscreen_canvas.width
 
-            len = graphics.DrawText(offscreen_canvas, font, motd_pos, 27, MOTD_COLOUR, motd) + 50
-            motd_pos -= 1
-            if (motd_pos + len < 0):
-                motd_pos = offscreen_canvas.width
-                motd = next_motd
+            else:
+                time_str = now.strftime("%H:%M:%S")
+
+                graphics.DrawText(offscreen_canvas, time_font, 4, 11, CLOCK_COLOUR, time_str)
+
+                len = graphics.DrawText(offscreen_canvas, font, motd_pos, 27, MOTD_COLOUR, motd)
+                motd_pos -= 1
+                if (motd_pos + len + 10 < 0):
+                    motd_pos = offscreen_canvas.width
+                    motd = next_motd
 
             time.sleep(0.05)
             offscreen_canvas = self.matrix.SwapOnVSync(offscreen_canvas)
