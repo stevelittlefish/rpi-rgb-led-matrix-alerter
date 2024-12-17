@@ -17,17 +17,22 @@ class Message:
 
 FETCH_EVERY = 30
 FETCH_ENDPOINT = "http://lemon.com/api/messages"
+SLEEP_ENDPOINT = "https://sleep.fig14.com/am-i-sleeping"
 
 CLOCK_COLOUR = graphics.Color(25, 25, 25)
 MOTD_COLOUR = graphics.Color(0, 0, 50)
 ALERT_COLOUR = graphics.Color(255, 0, 0)
 LOADING_COLOUR = graphics.Color(0, 12, 25)
+SLEEPING_COLOUR = graphics.Color(25, 0, 50)
+SLEEPING_UNDERLINE_COLOUR = graphics.Color(10, 0, 20)
 
 
 last_motd = None
-messages = [Message(LOADING_COLOUR, "Loading...")]
+messages = [Message(LOADING_COLOUR, "Hi!")]
 message = messages[0]
 message_index = 0
+
+daddy_sleeping = False
 
 alert = None
 
@@ -43,18 +48,24 @@ def get_messages():
     """
     Continuously poll for messages - run this in a thread!
     """
-    global alert, messages, last_motd
+    global alert, messages, last_motd, daddy_sleeping
     
     print("Starting message fetch loop")
 
     while True:
         try:
             # print("Fetching messages")
+            
+            new_messages = []
 
+            # Fetch MOTD
             r = requests.get(FETCH_ENDPOINT)
             if r.status_code != 200:
                 with message_lock:
-                    messages = [Message(ALERT_COLOUR, f"ERROR {r.status_code}")]
+                    error = f"ERROR: received {r.status_code} from {FETCH_ENDPOINT}"
+                    print(error)
+                    messages.append(error)
+                    continue
             else:
                 response = r.json()
 
@@ -63,8 +74,7 @@ def get_messages():
                     print(f"MOTD: {motd}")
                     last_motd = motd
 
-                with message_lock:
-                    messages = [Message(MOTD_COLOUR, motd)]
+                new_messages.append(Message(MOTD_COLOUR, motd))
 
                 with alert_lock:
                     if alert != response["alert"]:
@@ -73,6 +83,29 @@ def get_messages():
                             print("Alert over")
                         else:
                             print(f"ALERT: {alert}")
+
+            # Fetch sleep status
+            sleep_response = requests.get(SLEEP_ENDPOINT)
+
+            if sleep_response.status_code != 200:
+                error = f"ERROR: received {r.status_code} from {SLEEP_ENDPOINT}"
+                print(error)
+                new_messages.append(Message(ALERT_COLOUR, error))
+
+            else:
+                sleep_str = sleep_response.text
+                new_sleeping = "asleep" in sleep_str
+                if new_sleeping != daddy_sleeping:
+                    print(f"Sleep status: {sleep_str}")
+
+                daddy_sleeping = new_sleeping
+
+                if daddy_sleeping:
+                    new_messages.append(Message(SLEEPING_COLOUR, "Daddy is sleeping zzZzZzZZzZZzz..."))
+
+
+            with message_lock:
+                messages = new_messages
 
         except Exception as e:
             print(f"Error: {e}")
@@ -86,7 +119,7 @@ class RunText(SampleBase):
         self.parser.add_argument("-t", "--text", help="The text to scroll on the RGB LED panel", default="Hello world!")
 
     def run(self):
-        global message_pos, messages, message, alert_pos, message_index
+        global message_pos, messages, message, alert_pos, message_index, daddy_sleeping
 
         offscreen_canvas = self.matrix.CreateFrameCanvas()
 
@@ -132,7 +165,10 @@ class RunText(SampleBase):
 
                 graphics.DrawText(offscreen_canvas, time_font, 4, 11, CLOCK_COLOUR, time_str)
 
-                length = graphics.DrawText(offscreen_canvas, font, message_pos, 27, message.colour, message.text)
+                if daddy_sleeping:
+                    graphics.DrawLine(offscreen_canvas, 0, offscreen_canvas.height - 2, offscreen_canvas.width, offscreen_canvas.height - 2, SLEEPING_UNDERLINE_COLOUR)
+
+                length = graphics.DrawText(offscreen_canvas, font, message_pos, 26, message.colour, message.text)
                 message_pos -= 1
                 if (message_pos + length + 10 < 0):
                     message_pos = offscreen_canvas.width
