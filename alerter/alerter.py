@@ -1,11 +1,18 @@
 import time
 from datetime import datetime
 import threading
+from dataclasses import dataclass
 
 from rgbmatrix import graphics
 import requests
 
 from samplebase import SampleBase
+
+
+@dataclass
+class Message:
+    colour: graphics.Color
+    text: str
 
 
 FETCH_EVERY = 30
@@ -14,18 +21,21 @@ FETCH_ENDPOINT = "http://lemon.com/api/messages"
 CLOCK_COLOUR = graphics.Color(25, 25, 25)
 MOTD_COLOUR = graphics.Color(0, 0, 50)
 ALERT_COLOUR = graphics.Color(255, 0, 0)
+LOADING_COLOUR = graphics.Color(0, 12, 25)
 
 
-next_motd = "Loading..."
-motd = next_motd
-daddy_is_sleeping = False
+last_motd = None
+messages = [Message(LOADING_COLOUR, "Loading...")]
+message = messages[0]
+message_index = 0
+
 alert = None
 
-motd_pos = 0
+message_pos = 0
 alert_pos = 0
 
 
-motd_lock = threading.Lock()
+message_lock = threading.Lock()
 alert_lock = threading.Lock()
 
 
@@ -33,7 +43,7 @@ def get_messages():
     """
     Continuously poll for messages - run this in a thread!
     """
-    global alert, next_motd
+    global alert, messages, last_motd
     
     print("Starting message fetch loop")
 
@@ -43,14 +53,18 @@ def get_messages():
 
             r = requests.get(FETCH_ENDPOINT)
             if r.status_code != 200:
-                with motd_lock:
-                    next_motd = f"ERROR {r.status_code}"
+                with message_lock:
+                    messages = [Message(ALERT_COLOUR, f"ERROR {r.status_code}")]
             else:
                 response = r.json()
-                with motd_lock:
-                    if next_motd != response["motd"]:
-                        next_motd = response["motd"]
-                        print(f"MOTD: {next_motd}")
+
+                motd = response["motd"]
+                if motd != last_motd:
+                    print(f"MOTD: {motd}")
+                    last_motd = motd
+
+                with message_lock:
+                    messages = [Message(MOTD_COLOUR, motd)]
 
                 with alert_lock:
                     if alert != response["alert"]:
@@ -60,10 +74,10 @@ def get_messages():
                         else:
                             print(f"ALERT: {alert}")
 
-            time.sleep(30)
-
         except Exception as e:
             print(f"Error: {e}")
+
+        time.sleep(30)
 
 
 class RunText(SampleBase):
@@ -72,7 +86,7 @@ class RunText(SampleBase):
         self.parser.add_argument("-t", "--text", help="The text to scroll on the RGB LED panel", default="Hello world!")
 
     def run(self):
-        global motd_pos, motd, alert_pos
+        global message_pos, messages, message, alert_pos, message_index
 
         offscreen_canvas = self.matrix.CreateFrameCanvas()
 
@@ -82,7 +96,7 @@ class RunText(SampleBase):
         font = graphics.Font()
         # font.LoadFont("../fonts/clR6x12.bdf")
         font.LoadFont("../fonts/7x13.bdf")
-        motd_pos = offscreen_canvas.width
+        message_pos = offscreen_canvas.width
         
         alert_font = graphics.Font()
         alert_font.LoadFont("../fonts/7x13B.bdf")
@@ -108,9 +122,9 @@ class RunText(SampleBase):
                     graphics.DrawLine(offscreen_canvas, 0, offscreen_canvas.height - 2, offscreen_canvas.width, offscreen_canvas.height - 2, ALERT_COLOUR)
                     graphics.DrawLine(offscreen_canvas, 0, offscreen_canvas.height - 1, offscreen_canvas.width, offscreen_canvas.height - 1, ALERT_COLOUR)
 
-                len = graphics.DrawText(offscreen_canvas, alert_font, alert_pos, 20, ALERT_COLOUR, alert_to_render)
+                length = graphics.DrawText(offscreen_canvas, alert_font, alert_pos, 20, ALERT_COLOUR, alert_to_render)
                 alert_pos -= 1
-                if (alert_pos + len < 0):
+                if (alert_pos + length < 0):
                     alert_pos = offscreen_canvas.width
 
             else:
@@ -118,12 +132,15 @@ class RunText(SampleBase):
 
                 graphics.DrawText(offscreen_canvas, time_font, 4, 11, CLOCK_COLOUR, time_str)
 
-                len = graphics.DrawText(offscreen_canvas, font, motd_pos, 27, MOTD_COLOUR, motd)
-                motd_pos -= 1
-                if (motd_pos + len + 10 < 0):
-                    motd_pos = offscreen_canvas.width
-                    with motd_lock:
-                        motd = next_motd
+                length = graphics.DrawText(offscreen_canvas, font, message_pos, 27, message.colour, message.text)
+                message_pos -= 1
+                if (message_pos + length + 10 < 0):
+                    message_pos = offscreen_canvas.width
+                    message_index += 1
+                    with message_lock:
+                        if message_index >= len(messages):
+                            message_index = 0
+                        message = messages[message_index]
 
             time.sleep(0.05)
             offscreen_canvas = self.matrix.SwapOnVSync(offscreen_canvas)
