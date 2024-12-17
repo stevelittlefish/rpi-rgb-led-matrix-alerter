@@ -35,9 +35,11 @@ def get_messages():
     """
     global alert, next_motd
     
+    print("Starting message fetch loop")
+
     while True:
         try:
-            print("Fetching messages")
+            # print("Fetching messages")
 
             r = requests.get(FETCH_ENDPOINT)
             if r.status_code != 200:
@@ -46,9 +48,17 @@ def get_messages():
             else:
                 response = r.json()
                 with motd_lock:
-                    next_motd = response["motd"]
+                    if next_motd != response["motd"]:
+                        next_motd = response["motd"]
+                        print(f"MOTD: {next_motd}")
+
                 with alert_lock:
-                    alert = response["alert"]
+                    if alert != response["alert"]:
+                        alert = response["alert"]
+                        if alert is None:
+                            print("Alert over")
+                        else:
+                            print(f"ALERT: {alert}")
 
             time.sleep(30)
 
