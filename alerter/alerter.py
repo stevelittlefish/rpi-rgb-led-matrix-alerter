@@ -1,5 +1,6 @@
 import time
 from datetime import datetime
+import threading
 
 from rgbmatrix import graphics
 import requests
@@ -24,18 +25,35 @@ motd_pos = 0
 alert_pos = 0
 
 
+motd_lock = threading.Lock()
+alert_lock = threading.Lock()
+
+
 def get_messages():
+    """
+    Continuously poll for messages - run this in a thread!
+    """
     global alert, next_motd
+    
+    while True:
+        try:
+            print("Fetching messages")
 
-    print("Fetching messages")
+            r = requests.get(FETCH_ENDPOINT)
+            if r.status_code != 200:
+                with motd_lock:
+                    next_motd = f"ERROR {r.status_code}"
+            else:
+                response = r.json()
+                with motd_lock:
+                    next_motd = response["motd"]
+                with alert_lock:
+                    alert = response["alert"]
 
-    r = requests.get(FETCH_ENDPOINT)
-    if r.status_code != 200:
-        next_motd = f"ERROR {r.status_code}"
-    else:
-        response = r.json()
-        next_motd = response["motd"]
-        alert = response["alert"]
+            time.sleep(30)
+
+        except Exception as e:
+            print(f"Error: {e}")
 
 
 class RunText(SampleBase):
@@ -60,27 +78,27 @@ class RunText(SampleBase):
         alert_font.LoadFont("../fonts/7x13B.bdf")
         alert_pos = offscreen_canvas.width
 
-        next_fetch = 0
+        message_thread = threading.Thread(target=get_messages, daemon=True)
+        message_thread.start()
 
         while True:
             offscreen_canvas.Clear()
             now = datetime.now()
 
             unix_time = now.timestamp()
+            
+            alert_to_render = None
+            with alert_lock:
+                alert_to_render = alert
 
-            if unix_time > next_fetch:
-                next_fetch = unix_time + FETCH_EVERY
-
-                get_messages()
-
-            if alert:
+            if alert_to_render:
                 if (int(unix_time) % 2) == 0:
                     graphics.DrawLine(offscreen_canvas, 0, 0, offscreen_canvas.width, 0, ALERT_COLOUR)
                     graphics.DrawLine(offscreen_canvas, 0, 1, offscreen_canvas.width, 1, ALERT_COLOUR)
                     graphics.DrawLine(offscreen_canvas, 0, offscreen_canvas.height - 2, offscreen_canvas.width, offscreen_canvas.height - 2, ALERT_COLOUR)
                     graphics.DrawLine(offscreen_canvas, 0, offscreen_canvas.height - 1, offscreen_canvas.width, offscreen_canvas.height - 1, ALERT_COLOUR)
 
-                len = graphics.DrawText(offscreen_canvas, alert_font, alert_pos, 20, ALERT_COLOUR, alert)
+                len = graphics.DrawText(offscreen_canvas, alert_font, alert_pos, 20, ALERT_COLOUR, alert_to_render)
                 alert_pos -= 1
                 if (alert_pos + len < 0):
                     alert_pos = offscreen_canvas.width
@@ -94,7 +112,8 @@ class RunText(SampleBase):
                 motd_pos -= 1
                 if (motd_pos + len + 10 < 0):
                     motd_pos = offscreen_canvas.width
-                    motd = next_motd
+                    with motd_lock:
+                        motd = next_motd
 
             time.sleep(0.05)
             offscreen_canvas = self.matrix.SwapOnVSync(offscreen_canvas)
