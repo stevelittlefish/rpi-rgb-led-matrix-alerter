@@ -128,7 +128,7 @@ class RunText(SampleBase):
 
         font = graphics.Font()
         # font.LoadFont("../fonts/clR6x12.bdf")
-        font.LoadFont("../fonts/7x13.bdf")
+        font.LoadFont("../fonts/6x13.bdf")
         message_pos = offscreen_canvas.width
         
         alert_font = graphics.Font()
