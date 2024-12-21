@@ -69,7 +69,7 @@ def get_messages():
             else:
                 response = r.json()
 
-                motd = response["motd"]
+                motd = response["motd"].replace("\r", "").replace("\n", " \\\\ ")
                 if motd != last_motd:
                     print(f"MOTD: {motd}")
                     last_motd = motd
