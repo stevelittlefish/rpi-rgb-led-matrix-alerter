@@ -19,12 +19,12 @@ FETCH_EVERY = 30
 FETCH_ENDPOINT = "http://lemon.com/api/messages"
 SLEEP_ENDPOINT = "https://sleep.fig14.com/am-i-sleeping"
 
-CLOCK_COLOUR = graphics.Color(25, 25, 25)
-MOTD_COLOUR = graphics.Color(0, 0, 50)
+CLOCK_COLOUR = graphics.Color(37, 37, 37)
+MOTD_COLOUR = graphics.Color(12, 12, 75)
 ALERT_COLOUR = graphics.Color(255, 0, 0)
-LOADING_COLOUR = graphics.Color(0, 12, 25)
-SLEEPING_COLOUR = graphics.Color(25, 0, 50)
-SLEEPING_UNDERLINE_COLOUR = graphics.Color(10, 0, 20)
+LOADING_COLOUR = graphics.Color(0, 75, 0)
+SLEEPING_COLOUR = graphics.Color(37, 0, 75)
+SLEEPING_UNDERLINE_COLOUR = graphics.Color(15, 0, 30)
 
 
 last_motd = None
@@ -69,7 +69,7 @@ def get_messages():
             else:
                 response = r.json()
 
-                motd = response["motd"].replace("\r", "").replace("\n", " \\\\ ")
+                motd = response["motd"].replace("\r", "").replace("\n", "  ")
                 if motd != last_motd:
                     print(f"MOTD: {motd}")
                     last_motd = motd
