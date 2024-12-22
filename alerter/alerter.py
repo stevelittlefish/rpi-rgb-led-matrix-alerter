@@ -1,11 +1,20 @@
+# import sys
+# import os
+# 
+# file_path = os.path.dirname(os.path.realpath(__file__))
+# lib_path = os.path.join(file_path, "../bindings/python")
+# sys.path.append(lib_path)
+
 import logging
 import time
 from datetime import datetime
 import threading
 from dataclasses import dataclass
+import random
 
 from rgbmatrix import graphics
 import requests
+from PIL import Image
 
 from samplebase import SampleBase
 
@@ -32,8 +41,8 @@ SLEEPING_UNDERLINE_COLOUR = graphics.Color(15, 0, 30)
 
 
 last_motd = None
-messages = [Message(LOADING_COLOUR, "Hi!")]
-message = messages[0]
+messages = []
+message = None
 message_index = 0
 
 daddy_sleeping = False
@@ -46,6 +55,8 @@ alert_pos = 0
 
 message_lock = threading.Lock()
 alert_lock = threading.Lock()
+
+icon = Image.open("../icons/pikachu.png").convert("RGB")
 
 
 def get_messages():
@@ -142,17 +153,23 @@ class RunText(SampleBase):
         message_thread = threading.Thread(target=get_messages, daemon=True)
         message_thread.start()
 
+        image_pos = offscreen_canvas.width
+
         while True:
             offscreen_canvas.Clear()
             now = datetime.now()
 
             unix_time = now.timestamp()
-            
+
             alert_to_render = None
             with alert_lock:
                 alert_to_render = alert
+            
+            if image_pos > -32:
+                offscreen_canvas.SetImage(icon, image_pos)                
+                image_pos -= 1
 
-            if alert_to_render:
+            elif alert_to_render:
                 if (int(unix_time) % 2) == 0:
                     graphics.DrawLine(offscreen_canvas, 0, 0, offscreen_canvas.width, 0, ALERT_COLOUR)
                     graphics.DrawLine(offscreen_canvas, 0, 1, offscreen_canvas.width, 1, ALERT_COLOUR)
@@ -171,16 +188,30 @@ class RunText(SampleBase):
 
                 if daddy_sleeping:
                     graphics.DrawLine(offscreen_canvas, 0, offscreen_canvas.height - 2, offscreen_canvas.width, offscreen_canvas.height - 2, SLEEPING_UNDERLINE_COLOUR)
+                
+                # If no message is loaded, try to load one
+                if message is None:
+                    message_index = 0
+                    if messages:
+                        message = messages[0]
+                
+                # If we have a message
+                if message:
+                    length = graphics.DrawText(offscreen_canvas, font, message_pos, 26, message.colour, message.text)
 
-                length = graphics.DrawText(offscreen_canvas, font, message_pos, 26, message.colour, message.text)
-                message_pos -= 1
-                if (message_pos + length + 10 < 0):
-                    message_pos = offscreen_canvas.width
-                    message_index += 1
-                    with message_lock:
-                        if message_index >= len(messages):
-                            message_index = 0
-                        message = messages[message_index]
+                    message_pos -= 1
+                    if (message_pos + length + 10 < 0):
+                        message_pos = offscreen_canvas.width
+                        message_index += 1
+                        with message_lock:
+                            if message_index >= len(messages):
+                                message_index = 0
+                            message = messages[message_index]
+
+                        # Randomly show Pikachu
+                        if random.random() < 0.05:
+                            image_pos = offscreen_canvas.width
+
 
             time.sleep(0.05)
             offscreen_canvas = self.matrix.SwapOnVSync(offscreen_canvas)
