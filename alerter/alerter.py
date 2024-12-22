@@ -1,3 +1,4 @@
+import logging
 import time
 from datetime import datetime
 import threading
@@ -7,6 +8,9 @@ from rgbmatrix import graphics
 import requests
 
 from samplebase import SampleBase
+
+
+log = logging.getLogger(__name__)
 
 
 @dataclass
@@ -50,11 +54,11 @@ def get_messages():
     """
     global alert, messages, last_motd, daddy_sleeping
     
-    print("Starting message fetch loop")
+    log.info("Starting message fetch loop")
 
     while True:
         try:
-            # print("Fetching messages")
+            # log.info("Fetching messages")
             
             new_messages = []
 
@@ -63,7 +67,7 @@ def get_messages():
             if r.status_code != 200:
                 with message_lock:
                     error = f"ERROR: received {r.status_code} from {FETCH_ENDPOINT}"
-                    print(error)
+                    log.error(error)
                     messages.append(error)
                     continue
             else:
@@ -71,7 +75,7 @@ def get_messages():
 
                 motd = response["motd"].replace("\r", "").replace("\n", "  ")
                 if motd != last_motd:
-                    print(f"MOTD: {motd}")
+                    log.info(f"MOTD: {motd}")
                     last_motd = motd
 
                 new_messages.append(Message(MOTD_COLOUR, motd))
@@ -80,23 +84,23 @@ def get_messages():
                     if alert != response["alert"]:
                         alert = response["alert"]
                         if alert is None:
-                            print("Alert over")
+                            log.info("Alert over")
                         else:
-                            print(f"ALERT: {alert}")
+                            log.info(f"ALERT: {alert}")
 
             # Fetch sleep status
             sleep_response = requests.get(SLEEP_ENDPOINT)
 
             if sleep_response.status_code != 200:
                 error = f"ERROR: received {r.status_code} from {SLEEP_ENDPOINT}"
-                print(error)
+                log.error(error)
                 new_messages.append(Message(ALERT_COLOUR, error))
 
             else:
                 sleep_str = sleep_response.text
                 new_sleeping = "asleep" in sleep_str
                 if new_sleeping != daddy_sleeping:
-                    print(f"Sleep status: {sleep_str}")
+                    log.info(f"Sleep status: {sleep_str}")
 
                 daddy_sleeping = new_sleeping
 
@@ -108,7 +112,7 @@ def get_messages():
                 messages = new_messages
 
         except Exception as e:
-            print(f"Error: {e}")
+            log.exception("Exception in main loop")
 
         time.sleep(30)
 
@@ -184,6 +188,12 @@ class RunText(SampleBase):
 
 # Main function
 if __name__ == "__main__":
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s %(levelname)-8s %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S'
+    )
+
     run_text = RunText()
     if (not run_text.process()):
         run_text.print_help()
