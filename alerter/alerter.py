@@ -56,7 +56,7 @@ alert_pos = 0
 message_lock = threading.Lock()
 alert_lock = threading.Lock()
 
-icon = Image.open("../icons/pikachu.png").convert("RGB")
+icon = Image.open("../icons/santa.png").convert("RGB")
 
 
 def get_messages():
