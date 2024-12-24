@@ -210,6 +210,7 @@ class RunText(SampleBase):
 
                         # Randomly show Pikachu
                         if random.random() < 0.05:
+                            log.info("Pika pika!")
                             image_pos = offscreen_canvas.width
 
 
