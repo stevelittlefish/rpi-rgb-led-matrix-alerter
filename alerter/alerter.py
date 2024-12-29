@@ -45,6 +45,7 @@ ALERT_COLOUR = graphics.Color(255, 0, 0)
 LOADING_COLOUR = graphics.Color(0, 75, 0)
 SLEEPING_COLOUR = graphics.Color(37, 0, 75)
 SLEEPING_UNDERLINE_COLOUR = graphics.Color(15, 0, 30)
+BTC_COLOUR = graphics.Color(10, 50, 10)
 
 CANVAS_WIDTH = 64
 CANVAS_HEIGHT = 32
@@ -113,6 +114,7 @@ def get_messages():
                     continue
             else:
                 response = r.json()
+                log.info(response)
 
                 motd = response["motd"].replace("\r", "").replace("\n", "  ")
                 if motd != last_motd:
@@ -120,6 +122,9 @@ def get_messages():
                     last_motd = motd
 
                 new_messages.append(Message(MOTD_COLOUR, motd))
+
+                btc = response["btc"]
+                new_messages.append(Message(BTC_COLOUR, btc))
 
                 with alert_lock:
                     if alert != response["alert"]:
@@ -151,6 +156,11 @@ def get_messages():
 
             with message_lock:
                 messages = new_messages
+
+                # TODO remove debug
+                log.info("messages:")
+                for message in messages:
+                    log.info(message.text)
 
         except Exception as e:
             log.exception("Exception in main loop")
@@ -194,7 +204,7 @@ class RunText(SampleBase):
                 alert_to_render = alert
             
             if icon_pos > -32:
-                offscreen_canvas.SetImage(icon.image, icon_pos)                
+                offscreen_canvas.SetImage(icon.image, icon_pos)
                 icon_pos -= 1
 
             elif alert_to_render:
