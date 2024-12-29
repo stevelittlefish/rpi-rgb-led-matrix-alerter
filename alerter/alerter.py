@@ -1,6 +1,6 @@
 # import sys
 # import os
-# 
+#
 # file_path = os.path.dirname(os.path.realpath(__file__))
 # lib_path = os.path.join(file_path, "../bindings/python")
 # sys.path.append(lib_path)
@@ -70,7 +70,9 @@ alert_lock = threading.Lock()
 icons = [
     Icon("pikachu", "Pika pika!"),
     Icon("metroid", "Metroids!"),
-    Icon("link", "Link has come to town!"),
+    Icon("toad", "Our princess is in another castle!"),
+    Icon("core-x", "X Parasites!"),
+    Icon("oddish", "Oddish oddish!"),
 ]
 
 for icon in icons:
@@ -82,6 +84,7 @@ for icon in icons:
 
 icon_pos = CANVAS_WIDTH
 icon = random.choice(icons)
+
 
 def show_random_icon():
     global icon, icon_pos
@@ -153,7 +156,6 @@ def get_messages():
                 if daddy_sleeping:
                     new_messages.append(Message(SLEEPING_COLOUR, "Daddy is sleeping zzZzZzZZzZZzz..."))
 
-
             with message_lock:
                 messages = new_messages
 
@@ -163,7 +165,7 @@ def get_messages():
                     log.info(message.text)
 
         except Exception as e:
-            log.exception("Exception in main loop")
+            log.exception(f"Exception in main loop: {e}")
 
         time.sleep(30)
 
@@ -249,7 +251,6 @@ class RunText(SampleBase):
                         # Randomly show icon
                         if random.random() < 0.05:
                             show_random_icon()
-
 
             time.sleep(0.05)
             offscreen_canvas = self.matrix.SwapOnVSync(offscreen_canvas)
