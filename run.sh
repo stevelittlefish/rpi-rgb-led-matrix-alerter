@@ -1,3 +1,3 @@
 #!/bin/bash
-cd alerter
+cd "$(dirname "$0")/alerter"
 python ./alerter.py $*
