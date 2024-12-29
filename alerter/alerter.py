@@ -117,7 +117,6 @@ def get_messages():
                     continue
             else:
                 response = r.json()
-                log.info(response)
 
                 motd = response["motd"].replace("\r", "").replace("\n", "  ")
                 if motd != last_motd:
@@ -158,11 +157,6 @@ def get_messages():
 
             with message_lock:
                 messages = new_messages
-
-                # TODO remove debug
-                log.info("messages:")
-                for message in messages:
-                    log.info(message.text)
 
         except Exception as e:
             log.exception(f"Exception in main loop: {e}")
