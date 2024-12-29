@@ -28,6 +28,13 @@ class Message:
     text: str
 
 
+@dataclass
+class Icon:
+    name: str
+    text: str
+    image: Image = None
+
+
 FETCH_EVERY = 30
 FETCH_ENDPOINT = "http://lemon.com/api/messages"
 SLEEP_ENDPOINT = "https://sleep.fig14.com/am-i-sleeping"
@@ -38,6 +45,9 @@ ALERT_COLOUR = graphics.Color(255, 0, 0)
 LOADING_COLOUR = graphics.Color(0, 75, 0)
 SLEEPING_COLOUR = graphics.Color(37, 0, 75)
 SLEEPING_UNDERLINE_COLOUR = graphics.Color(15, 0, 30)
+
+CANVAS_WIDTH = 64
+CANVAS_HEIGHT = 32
 
 
 last_motd = None
@@ -56,7 +66,23 @@ alert_pos = 0
 message_lock = threading.Lock()
 alert_lock = threading.Lock()
 
-icon = Image.open("../icons/pikachu.png").convert("RGB")
+icons = [
+    Icon("pikachu", "Pika pika!"),
+    Icon("metroid", "Metroids!"),
+    Icon("link", "Link has come to town!"),
+]
+
+for icon in icons:
+    icon.image = Image.open(f"../icons/{icon.name}.png").convert("RGB")
+
+icon_pos = CANVAS_WIDTH
+icon = random.choice(icons)
+
+def show_random_icon():
+    global icon, icon_pos
+    icon = random.choice(icons)
+    log.info(icon.text)
+    icon_pos = CANVAS_WIDTH
 
 
 def get_messages():
@@ -134,7 +160,7 @@ class RunText(SampleBase):
         self.parser.add_argument("-t", "--text", help="The text to scroll on the RGB LED panel", default="Hello world!")
 
     def run(self):
-        global message_pos, messages, message, alert_pos, message_index, daddy_sleeping
+        global message_pos, messages, message, alert_pos, message_index, daddy_sleeping, icon_pos
 
         offscreen_canvas = self.matrix.CreateFrameCanvas()
 
@@ -144,16 +170,14 @@ class RunText(SampleBase):
         font = graphics.Font()
         # font.LoadFont("../fonts/clR6x12.bdf")
         font.LoadFont("../fonts/6x13.bdf")
-        message_pos = offscreen_canvas.width
+        message_pos = CANVAS_WIDTH
         
         alert_font = graphics.Font()
         alert_font.LoadFont("../fonts/7x13B.bdf")
-        alert_pos = offscreen_canvas.width
+        alert_pos = CANVAS_WIDTH
 
         message_thread = threading.Thread(target=get_messages, daemon=True)
         message_thread.start()
-
-        image_pos = offscreen_canvas.width
 
         while True:
             offscreen_canvas.Clear()
@@ -165,21 +189,21 @@ class RunText(SampleBase):
             with alert_lock:
                 alert_to_render = alert
             
-            if image_pos > -32:
-                offscreen_canvas.SetImage(icon, image_pos)                
-                image_pos -= 1
+            if icon_pos > -32:
+                offscreen_canvas.SetImage(icon.image, icon_pos)                
+                icon_pos -= 1
 
             elif alert_to_render:
                 if (int(unix_time) % 2) == 0:
-                    graphics.DrawLine(offscreen_canvas, 0, 0, offscreen_canvas.width, 0, ALERT_COLOUR)
-                    graphics.DrawLine(offscreen_canvas, 0, 1, offscreen_canvas.width, 1, ALERT_COLOUR)
-                    graphics.DrawLine(offscreen_canvas, 0, offscreen_canvas.height - 2, offscreen_canvas.width, offscreen_canvas.height - 2, ALERT_COLOUR)
-                    graphics.DrawLine(offscreen_canvas, 0, offscreen_canvas.height - 1, offscreen_canvas.width, offscreen_canvas.height - 1, ALERT_COLOUR)
+                    graphics.DrawLine(offscreen_canvas, 0, 0, CANVAS_WIDTH, 0, ALERT_COLOUR)
+                    graphics.DrawLine(offscreen_canvas, 0, 1, CANVAS_WIDTH, 1, ALERT_COLOUR)
+                    graphics.DrawLine(offscreen_canvas, 0, CANVAS_HEIGHT - 2, CANVAS_WIDTH, CANVAS_HEIGHT - 2, ALERT_COLOUR)
+                    graphics.DrawLine(offscreen_canvas, 0, CANVAS_HEIGHT - 1, CANVAS_WIDTH, CANVAS_HEIGHT - 1, ALERT_COLOUR)
 
                 length = graphics.DrawText(offscreen_canvas, alert_font, alert_pos, 20, ALERT_COLOUR, alert_to_render)
                 alert_pos -= 1
                 if (alert_pos + length < 0):
-                    alert_pos = offscreen_canvas.width
+                    alert_pos = CANVAS_WIDTH
 
             else:
                 time_str = now.strftime("%H:%M:%S")
@@ -187,7 +211,7 @@ class RunText(SampleBase):
                 graphics.DrawText(offscreen_canvas, time_font, 4, 11, CLOCK_COLOUR, time_str)
 
                 if daddy_sleeping:
-                    graphics.DrawLine(offscreen_canvas, 0, offscreen_canvas.height - 2, offscreen_canvas.width, offscreen_canvas.height - 2, SLEEPING_UNDERLINE_COLOUR)
+                    graphics.DrawLine(offscreen_canvas, 0, CANVAS_HEIGHT - 2, CANVAS_WIDTH, CANVAS_HEIGHT - 2, SLEEPING_UNDERLINE_COLOUR)
                 
                 # If no message is loaded, try to load one
                 if message is None:
@@ -201,17 +225,16 @@ class RunText(SampleBase):
 
                     message_pos -= 1
                     if (message_pos + length + 10 < 0):
-                        message_pos = offscreen_canvas.width
+                        message_pos = CANVAS_WIDTH
                         message_index += 1
                         with message_lock:
                             if message_index >= len(messages):
                                 message_index = 0
                             message = messages[message_index]
 
-                        # Randomly show Pikachu
+                        # Randomly show icon
                         if random.random() < 0.05:
-                            log.info("Pika pika!")
-                            image_pos = offscreen_canvas.width
+                            show_random_icon()
 
 
             time.sleep(0.05)
