@@ -14,7 +14,7 @@ import random
 
 from rgbmatrix import graphics
 import requests
-from PIL import Image
+from PIL import Image, ImageEnhance
 
 from samplebase import SampleBase
 
@@ -73,7 +73,11 @@ icons = [
 ]
 
 for icon in icons:
-    icon.image = Image.open(f"../icons/{icon.name}.png").convert("RGB")
+    image = Image.open(f"../icons/{icon.name}.png").convert("RGB")
+    enhancer = ImageEnhance.Brightness(image)
+    # to reduce brightness by 50%, use factor 0.5
+    icon.image = enhancer.enhance(0.5)
+ 
 
 icon_pos = CANVAS_WIDTH
 icon = random.choice(icons)
