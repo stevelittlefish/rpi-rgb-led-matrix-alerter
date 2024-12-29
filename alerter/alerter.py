@@ -45,7 +45,7 @@ ALERT_COLOUR = graphics.Color(255, 0, 0)
 LOADING_COLOUR = graphics.Color(0, 75, 0)
 SLEEPING_COLOUR = graphics.Color(37, 0, 75)
 SLEEPING_UNDERLINE_COLOUR = graphics.Color(15, 0, 30)
-BTC_COLOUR = graphics.Color(10, 50, 10)
+BTC_COLOUR = graphics.Color(10, 70, 10)
 
 CANVAS_WIDTH = 64
 CANVAS_HEIGHT = 32
@@ -243,7 +243,7 @@ class RunText(SampleBase):
                             message = messages[message_index]
 
                         # Randomly show icon
-                        if random.random() < 0.05:
+                        if random.random() < 0.1:
                             show_random_icon()
 
             time.sleep(0.05)
