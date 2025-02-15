@@ -17,6 +17,7 @@ import requests
 from PIL import Image, ImageEnhance
 
 from samplebase import SampleBase
+import ping3
 
 
 log = logging.getLogger(__name__)
@@ -40,7 +41,8 @@ FETCH_ENDPOINT = "http://lemon.com/api/messages"
 SLEEP_ENDPOINT = "https://sleep.fig14.com/am-i-sleeping"
 
 CLOCK_COLOUR = graphics.Color(37, 37, 37)
-MOTD_COLOUR = graphics.Color(12, 12, 75)
+MOTD_COLOUR = graphics.Color(12, 45, 55)
+AI_MOTD_COLOUR = graphics.Color(12, 12, 80)
 ALERT_COLOUR = graphics.Color(255, 0, 0)
 LOADING_COLOUR = graphics.Color(0, 75, 0)
 SLEEPING_COLOUR = graphics.Color(37, 0, 75)
@@ -50,8 +52,11 @@ BTC_COLOUR = graphics.Color(10, 70, 10)
 CANVAS_WIDTH = 64
 CANVAS_HEIGHT = 32
 
+ICON_PROBABILITY = 0.05
+
 
 last_motd = None
+last_ai_motd = None
 messages = []
 message = None
 message_index = 0
@@ -59,6 +64,7 @@ message_index = 0
 daddy_sleeping = False
 
 alert = None
+no_internet_message = None
 
 message_pos = 0
 alert_pos = 0
@@ -66,6 +72,7 @@ alert_pos = 0
 
 message_lock = threading.Lock()
 alert_lock = threading.Lock()
+internet_lock = threading.Lock()
 
 icons = [
     Icon("pikachu", "Pika pika!"),
@@ -93,19 +100,38 @@ def show_random_icon():
     icon_pos = CANVAS_WIDTH
 
 
+def check_internet():
+    host = "8.8.8.8"
+    try:
+        response = ping3.ping(host, timeout=5)
+        if response is not None:
+            return True
+        else:
+            print(f"{host} is not reachable.")
+            return False
+    except exceptions.PingError as e:
+        print(f"Ping error for {host}: {e}")
+        return False
+
+
 def get_messages():
     """
     Continuously poll for messages - run this in a thread!
     """
-    global alert, messages, last_motd, daddy_sleeping
+    global alert, messages, last_motd, last_ai_motd, daddy_sleeping, no_internet_message
     
     log.info("Starting message fetch loop")
 
     while True:
         try:
-            # log.info("Fetching messages")
-            
             new_messages = []
+            
+            connected_to_internet = check_internet()
+            with internet_lock:
+                if connected_to_internet:
+                    no_internet_message = None
+                else:
+                    no_internet_message = "Internet is Down!"
 
             # Fetch MOTD
             r = requests.get(FETCH_ENDPOINT)
@@ -117,13 +143,20 @@ def get_messages():
                     continue
             else:
                 response = r.json()
-
+                
                 motd = response["motd"].replace("\r", "").replace("\n", "  ")
                 if motd != last_motd:
                     log.info(f"MOTD: {motd}")
                     last_motd = motd
 
                 new_messages.append(Message(MOTD_COLOUR, motd))
+                
+                ai_motd = response["ai_motd"].replace("\r", "").replace("\n", "  ")
+                if ai_motd != last_ai_motd:
+                    log.info(f"AI MOTD: {ai_motd}")
+                    last_ai_motd = ai_motd
+
+                new_messages.append(Message(AI_MOTD_COLOUR, ai_motd))
 
                 btc = response["btc"]
                 new_messages.append(Message(BTC_COLOUR, btc))
@@ -137,23 +170,24 @@ def get_messages():
                             log.info(f"ALERT: {alert}")
 
             # Fetch sleep status
-            sleep_response = requests.get(SLEEP_ENDPOINT)
+            if connected_to_internet:
+                sleep_response = requests.get(SLEEP_ENDPOINT)
 
-            if sleep_response.status_code != 200:
-                error = f"ERROR: received {r.status_code} from {SLEEP_ENDPOINT}"
-                log.error(error)
-                new_messages.append(Message(ALERT_COLOUR, error))
+                if sleep_response.status_code != 200:
+                    error = f"ERROR: received {r.status_code} from {SLEEP_ENDPOINT}"
+                    log.error(error)
+                    new_messages.append(Message(ALERT_COLOUR, error))
 
-            else:
-                sleep_str = sleep_response.text
-                new_sleeping = "asleep" in sleep_str
-                if new_sleeping != daddy_sleeping:
-                    log.info(f"Sleep status: {sleep_str}")
+                else:
+                    sleep_str = sleep_response.text
+                    new_sleeping = "asleep" in sleep_str
+                    if new_sleeping != daddy_sleeping:
+                        log.info(f"Sleep status: {sleep_str}")
 
-                daddy_sleeping = new_sleeping
+                    daddy_sleeping = new_sleeping
 
-                if daddy_sleeping:
-                    new_messages.append(Message(SLEEPING_COLOUR, "Daddy is sleeping zzZzZzZZzZZzz..."))
+                    if daddy_sleeping:
+                        new_messages.append(Message(SLEEPING_COLOUR, "Daddy is sleeping zzZzZzZZzZZzz..."))
 
             with message_lock:
                 messages = new_messages
@@ -198,6 +232,13 @@ class RunText(SampleBase):
             alert_to_render = None
             with alert_lock:
                 alert_to_render = alert
+
+            with internet_lock:
+                if no_internet_message:
+                    if alert_to_render:
+                        alert_to_render = f"{alert_to_render}    {no_internet_message}"
+                    else:
+                        alert_to_render = no_internet_message
             
             if icon_pos > -32:
                 offscreen_canvas.SetImage(icon.image, icon_pos)
@@ -243,10 +284,10 @@ class RunText(SampleBase):
                             message = messages[message_index]
 
                         # Randomly show icon
-                        if random.random() < 0.1:
+                        if random.random() < ICON_PROBABILITY:
                             show_random_icon()
 
-            time.sleep(0.05)
+            time.sleep(0.025)
             offscreen_canvas = self.matrix.SwapOnVSync(offscreen_canvas)
 
 
