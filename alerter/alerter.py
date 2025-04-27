@@ -48,6 +48,7 @@ LOADING_COLOUR = graphics.Color(0, 75, 0)
 SLEEPING_COLOUR = graphics.Color(37, 0, 75)
 SLEEPING_UNDERLINE_COLOUR = graphics.Color(15, 0, 30)
 BTC_COLOUR = graphics.Color(10, 70, 10)
+INTERNET_FAILOVER_COLOUR = graphics.Color(50, 25, 0)
 
 CANVAS_WIDTH = 64
 CANVAS_HEIGHT = 32
@@ -62,6 +63,7 @@ message = None
 message_index = 0
 
 daddy_sleeping = False
+internet_failover = None
 
 alert = None
 no_internet_message = None
@@ -118,7 +120,8 @@ def get_messages():
     """
     Continuously poll for messages - run this in a thread!
     """
-    global alert, messages, last_motd, last_ai_motd, daddy_sleeping, no_internet_message
+    global alert, messages, last_motd, last_ai_motd, daddy_sleeping, \
+        no_internet_message, internet_failover
     
     log.info("Starting message fetch loop")
 
@@ -168,6 +171,13 @@ def get_messages():
                             log.info("Alert over")
                         else:
                             log.info(f"ALERT: {alert}")
+
+                # Connection status
+                connection_status = response["connection-status"]
+                new_internet_failover = connection_status != "normal"
+                if new_internet_failover != internet_failover:
+                    print(f"Failover status changed to {new_internet_failover}")
+                    internet_failover = new_internet_failover
 
             # Fetch sleep status
             if connected_to_internet:
@@ -263,6 +273,10 @@ class RunText(SampleBase):
 
                 if daddy_sleeping:
                     graphics.DrawLine(offscreen_canvas, 0, CANVAS_HEIGHT - 2, CANVAS_WIDTH, CANVAS_HEIGHT - 2, SLEEPING_UNDERLINE_COLOUR)
+                
+                if internet_failover:
+                    for i in range(3):
+                        graphics.DrawLine(offscreen_canvas, CANVAS_WIDTH - 3, CANVAS_HEIGHT - 1 - i, CANVAS_WIDTH, CANVAS_HEIGHT - 1 - i, INTERNET_FAILOVER_COLOUR)
                 
                 # If no message is loaded, try to load one
                 if message is None:
