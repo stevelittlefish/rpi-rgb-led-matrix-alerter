@@ -102,18 +102,28 @@ def show_random_icon():
     icon_pos = CANVAS_WIDTH
 
 
-def check_internet():
-    host = "8.8.8.8"
+def ping_remote_server(host="8.8.8.8"):
     try:
         response = ping3.ping(host, timeout=5)
         if response is not None:
             return True
         else:
-            print(f"{host} is not reachable.")
+            log.info(f"{host} is not reachable.")
             return False
     except exceptions.PingError as e:
-        print(f"Ping error for {host}: {e}")
+        log.info(f"Ping error for {host}: {e}")
         return False
+
+
+def check_internet(num_attempts=2):
+    for i in range(num_attempts):
+        if i != 0:
+            log.info(f"Retrying (attempt {i+1})")
+
+        if ping_remote_server():
+            return True
+
+    return False
 
 
 def get_messages():
@@ -176,7 +186,7 @@ def get_messages():
                 connection_status = response["connection-status"]
                 new_internet_failover = connection_status != "normal"
                 if new_internet_failover != internet_failover:
-                    print(f"Failover status changed to {new_internet_failover}")
+                    log.info(f"Failover status changed to {new_internet_failover}")
                     internet_failover = new_internet_failover
 
             # Fetch sleep status
