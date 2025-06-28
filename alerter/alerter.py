@@ -82,6 +82,7 @@ icons = [
     Icon("toad", "Our princess is in another castle!"),
     Icon("core-x", "X Parasites!"),
     Icon("oddish", "Oddish oddish!"),
+    Icon("ultros", "Yeowch! Seafood soup!"),
 ]
 
 for icon in icons:
@@ -89,7 +90,7 @@ for icon in icons:
     enhancer = ImageEnhance.Brightness(image)
     # to reduce brightness by 50%, use factor 0.5
     icon.image = enhancer.enhance(0.5)
- 
+
 
 icon_pos = CANVAS_WIDTH
 icon = random.choice(icons)
@@ -132,13 +133,13 @@ def get_messages():
     """
     global alert, messages, last_motd, last_ai_motd, daddy_sleeping, \
         no_internet_message, internet_failover
-    
+
     log.info("Starting message fetch loop")
 
     while True:
         try:
             new_messages = []
-            
+
             connected_to_internet = check_internet()
             with internet_lock:
                 if connected_to_internet:
@@ -156,14 +157,14 @@ def get_messages():
                     continue
             else:
                 response = r.json()
-                
+
                 motd = response["motd"].replace("\r", "").replace("\n", "  ")
                 if motd != last_motd:
                     log.info(f"MOTD: {motd}")
                     last_motd = motd
 
                 new_messages.append(Message(MOTD_COLOUR, motd))
-                
+
                 ai_motd = response["ai_motd"].replace("\r", "").replace("\n", "  ")
                 if ai_motd != last_ai_motd:
                     log.info(f"AI MOTD: {ai_motd}")
@@ -235,7 +236,7 @@ class RunText(SampleBase):
         # font.LoadFont("../fonts/clR6x12.bdf")
         font.LoadFont("../fonts/6x13.bdf")
         message_pos = CANVAS_WIDTH
-        
+
         alert_font = graphics.Font()
         alert_font.LoadFont("../fonts/7x13B.bdf")
         alert_pos = CANVAS_WIDTH
@@ -259,7 +260,7 @@ class RunText(SampleBase):
                         alert_to_render = f"{alert_to_render}    {no_internet_message}"
                     else:
                         alert_to_render = no_internet_message
-            
+
             if icon_pos > -32:
                 offscreen_canvas.SetImage(icon.image, icon_pos)
                 icon_pos -= 1
@@ -283,17 +284,17 @@ class RunText(SampleBase):
 
                 if daddy_sleeping:
                     graphics.DrawLine(offscreen_canvas, 0, CANVAS_HEIGHT - 2, CANVAS_WIDTH, CANVAS_HEIGHT - 2, SLEEPING_UNDERLINE_COLOUR)
-                
+
                 if internet_failover:
                     for i in range(3):
                         graphics.DrawLine(offscreen_canvas, CANVAS_WIDTH - 3, CANVAS_HEIGHT - 1 - i, CANVAS_WIDTH, CANVAS_HEIGHT - 1 - i, INTERNET_FAILOVER_COLOUR)
-                
+
                 # If no message is loaded, try to load one
                 if message is None:
                     message_index = 0
                     if messages:
                         message = messages[0]
-                
+
                 # If we have a message
                 if message:
                     length = graphics.DrawText(offscreen_canvas, font, message_pos, 26, message.colour, message.text)
