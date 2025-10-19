@@ -41,6 +41,7 @@ FETCH_EVERY = 30
 FETCH_ENDPOINT = "http://lemon.com/api/messages"
 SLEEP_ENDPOINT = "https://sleep.fig14.com/am-i-sleeping"
 
+WHITE = graphics.Color(80, 80, 80)
 CLOCK_COLOUR = graphics.Color(37, 37, 37)
 MOTD_COLOUR = graphics.Color(12, 45, 55)
 AI_MOTD_COLOUR = graphics.Color(12, 12, 80)
@@ -69,8 +70,9 @@ internet_failover = None
 alert = None
 no_internet_message = None
 
-message_pos = 0
-alert_pos = 0
+message_pos = CANVAS_WIDTH
+alert_pos = CANVAS_WIDTH
+
 
 time_font = graphics.Font()
 seconds_font = graphics.Font()
@@ -230,6 +232,30 @@ def get_messages():
         time.sleep(30)
 
 
+def render_and_scroll_alert(canvas, unix_time, alert_text):
+    global alert_pos
+
+    if (int(unix_time) % 2) == 0:
+        graphics.DrawLine(canvas, 0, 0, CANVAS_WIDTH, 0, ALERT_COLOUR)
+        graphics.DrawLine(canvas, 0, 1, CANVAS_WIDTH, 1, ALERT_COLOUR)
+        graphics.DrawLine(canvas, 0, CANVAS_HEIGHT - 2, CANVAS_WIDTH, CANVAS_HEIGHT - 2, ALERT_COLOUR)
+        graphics.DrawLine(canvas, 0, CANVAS_HEIGHT - 1, CANVAS_WIDTH, CANVAS_HEIGHT - 1, ALERT_COLOUR)
+
+    length = graphics.DrawText(canvas, alert_font, alert_pos, 26, ALERT_COLOUR, alert_text)
+    alert_pos -= 1
+    if (alert_pos + length < 0):
+        alert_pos = CANVAS_WIDTH
+
+
+def render_time_small_and_bright(canvas, now):
+    if TIME_FORMAT_24_HOUR:
+        time_str = now.strftime("%H:%M:%S")
+    else:
+        time_str = now.strftime("%I:%M:%S")
+
+    graphics.DrawText(canvas, seconds_font, 8, 12, WHITE, time_str)
+
+
 def render_time(canvas, now):
     FONT_W = 7
 
@@ -295,9 +321,6 @@ def main(matrix):
     message_font.LoadFont("../fonts/6x13.bdf")
     alert_font.LoadFont("../fonts/7x13B.bdf")
 
-    message_pos = CANVAS_WIDTH
-    alert_pos = CANVAS_WIDTH
-
     message_thread = threading.Thread(target=get_messages, daemon=True)
     message_thread.start()
 
@@ -323,20 +346,13 @@ def main(matrix):
             icon_pos -= 1
 
         elif alert_to_render:
-            if (int(unix_time) % 2) == 0:
-                graphics.DrawLine(canvas, 0, 0, CANVAS_WIDTH, 0, ALERT_COLOUR)
-                graphics.DrawLine(canvas, 0, 1, CANVAS_WIDTH, 1, ALERT_COLOUR)
-                graphics.DrawLine(canvas, 0, CANVAS_HEIGHT - 2, CANVAS_WIDTH, CANVAS_HEIGHT - 2, ALERT_COLOUR)
-                graphics.DrawLine(canvas, 0, CANVAS_HEIGHT - 1, CANVAS_WIDTH, CANVAS_HEIGHT - 1, ALERT_COLOUR)
-
-            length = graphics.DrawText(canvas, alert_font, alert_pos, 20, ALERT_COLOUR, alert_to_render)
-            alert_pos -= 1
-            if (alert_pos + length < 0):
-                alert_pos = CANVAS_WIDTH
+            render_time_small_and_bright(canvas, now)
+            render_and_scroll_alert(canvas, unix_time, alert_to_render)
 
         else:
             # Draw the main clock face
             render_time(canvas, now)
+
             if daddy_sleeping:
                 graphics.DrawLine(canvas, 0, CANVAS_HEIGHT - 2, CANVAS_WIDTH, CANVAS_HEIGHT - 2, SLEEPING_UNDERLINE_COLOUR)
 
