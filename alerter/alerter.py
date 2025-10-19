@@ -169,7 +169,7 @@ def get_messages():
                 if motd != last_motd:
                     log.info(f"MOTD: {motd}")
                     last_motd = motd
-
+                
                 new_messages.append(Message(MOTD_COLOUR, motd))
 
                 ai_motd = response["ai_motd"].replace("\r", "").replace("\n", "  ")
@@ -177,6 +177,10 @@ def get_messages():
                     log.info(f"AI MOTD: {ai_motd}")
                     last_ai_motd = ai_motd
 
+                # Add the date to the AI MOTD
+                now = datetime.now()
+                date_str = now.strftime("%a %d %b")
+                ai_motd = " - ".join([date_str, ai_motd])
                 new_messages.append(Message(AI_MOTD_COLOUR, ai_motd))
 
                 btc = response["btc"]
