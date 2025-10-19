@@ -252,8 +252,10 @@ def render_time_small_and_bright(canvas, now):
         time_str = now.strftime("%H:%M:%S")
     else:
         time_str = now.strftime("%I:%M:%S")
+        if time_str[0] == "0":
+            time_str = " " + time_str[1:]
 
-    graphics.DrawText(canvas, seconds_font, 8, 12, WHITE, time_str)
+    graphics.DrawText(canvas, seconds_font, 6, 12, WHITE, time_str)
 
 
 def render_time(canvas, now):
