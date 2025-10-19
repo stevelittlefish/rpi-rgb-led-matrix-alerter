@@ -35,6 +35,7 @@ class Icon:
     text: str
     image: Image = None
 
+TIME_FORMAT_24_HOUR = False
 
 FETCH_EVERY = 30
 FETCH_ENDPOINT = "http://lemon.com/api/messages"
@@ -71,6 +72,11 @@ no_internet_message = None
 message_pos = 0
 alert_pos = 0
 
+time_font = graphics.Font()
+seconds_font = graphics.Font()
+pm_font = graphics.Font()
+alert_font = graphics.Font()
+message_font = graphics.Font()
 
 message_lock = threading.Lock()
 alert_lock = threading.Lock()
@@ -219,104 +225,157 @@ def get_messages():
         time.sleep(30)
 
 
+def render_time(canvas, now):
+    FONT_W = 7
+
+    x = 3
+    y = 11
+
+    hour = now.hour
+    pm = hour >= 12
+    
+    # Render the hour
+    if hour > 12 and not TIME_FORMAT_24_HOUR:
+        hour -= 12
+
+    hour_str = str(hour)
+    if len(hour_str) == 1:
+        x += FONT_W
+
+    graphics.DrawText(canvas, time_font, x, y, CLOCK_COLOUR, hour_str)
+    x += FONT_W * len(hour_str)
+    # Colon glyph is not the right size for some reason...
+    graphics.DrawText(canvas, time_font, x + 1, y, CLOCK_COLOUR, ":")
+    x += FONT_W
+
+    # Render the minutes
+    min_str = str(now.minute)
+    if len(min_str) == 1:
+        min_str = "0" + min_str
+
+    graphics.DrawText(canvas, time_font, x, y, CLOCK_COLOUR, min_str)
+    x += FONT_W * 2
+    graphics.DrawText(canvas, time_font, x + 1, y, CLOCK_COLOUR, ":")
+    x += FONT_W
+    
+    # Seconds
+    sec_str = str(now.second)
+    if len(sec_str) == 1:
+        sec_str = "0" + sec_str
+
+    graphics.DrawText(canvas, seconds_font, x, y, CLOCK_COLOUR, sec_str)
+    # Slimmer font
+    x += 6 * 2 + 2
+
+    if pm:
+        graphics.DrawText(canvas, pm_font, x, y - 1, CLOCK_COLOUR, "p")
+
+    # time_str = now.strftime("%H:%M:%S")
+    # graphics.DrawText(canvas, time_font, 4, 11, CLOCK_COLOUR, time_str)
+
+
+def main(matrix):
+    """
+    Main function to repeatedly render the sign
+    """
+    global message_pos, messages, message, alert_pos, message_index, \
+        daddy_sleeping, icon_pos, time_font, message_font, alert_font, \
+        seconds_font, pm_font
+
+    canvas = matrix.CreateFrameCanvas()
+
+    time_font.LoadFont("../fonts/7x13.bdf")
+    seconds_font.LoadFont("../fonts/clR6x12.bdf")
+    pm_font.LoadFont("../fonts/4x6.bdf")
+    message_font.LoadFont("../fonts/6x13.bdf")
+    alert_font.LoadFont("../fonts/7x13B.bdf")
+
+    message_pos = CANVAS_WIDTH
+    alert_pos = CANVAS_WIDTH
+
+    message_thread = threading.Thread(target=get_messages, daemon=True)
+    message_thread.start()
+
+    while True:
+        canvas.Clear()
+        now = datetime.now()
+
+        unix_time = now.timestamp()
+
+        alert_to_render = None
+        with alert_lock:
+            alert_to_render = alert
+
+        with internet_lock:
+            if no_internet_message:
+                if alert_to_render:
+                    alert_to_render = f"{alert_to_render}    {no_internet_message}"
+                else:
+                    alert_to_render = no_internet_message
+
+        if icon_pos > -32:
+            canvas.SetImage(icon.image, icon_pos)
+            icon_pos -= 1
+
+        elif alert_to_render:
+            if (int(unix_time) % 2) == 0:
+                graphics.DrawLine(canvas, 0, 0, CANVAS_WIDTH, 0, ALERT_COLOUR)
+                graphics.DrawLine(canvas, 0, 1, CANVAS_WIDTH, 1, ALERT_COLOUR)
+                graphics.DrawLine(canvas, 0, CANVAS_HEIGHT - 2, CANVAS_WIDTH, CANVAS_HEIGHT - 2, ALERT_COLOUR)
+                graphics.DrawLine(canvas, 0, CANVAS_HEIGHT - 1, CANVAS_WIDTH, CANVAS_HEIGHT - 1, ALERT_COLOUR)
+
+            length = graphics.DrawText(canvas, alert_font, alert_pos, 20, ALERT_COLOUR, alert_to_render)
+            alert_pos -= 1
+            if (alert_pos + length < 0):
+                alert_pos = CANVAS_WIDTH
+
+        else:
+            # Draw the main clock face
+            render_time(canvas, now)
+            if daddy_sleeping:
+                graphics.DrawLine(canvas, 0, CANVAS_HEIGHT - 2, CANVAS_WIDTH, CANVAS_HEIGHT - 2, SLEEPING_UNDERLINE_COLOUR)
+
+            if internet_failover:
+                for i in range(3):
+                    graphics.DrawLine(canvas, CANVAS_WIDTH - 3, CANVAS_HEIGHT - 1 - i, CANVAS_WIDTH, CANVAS_HEIGHT - 1 - i, INTERNET_FAILOVER_COLOUR)
+
+            # If no message is loaded, try to load one
+            if message is None:
+                message_index = 0
+                if messages:
+                    message = messages[0]
+
+            # If we have a message
+            if message:
+                length = graphics.DrawText(canvas, message_font, message_pos, 26, message.colour, message.text)
+
+                message_pos -= 1
+                if (message_pos + length + 10 < 0):
+                    message_pos = CANVAS_WIDTH
+                    message_index += 1
+                    with message_lock:
+                        if message_index >= len(messages):
+                            message_index = 0
+                        message = messages[message_index]
+
+                    # Randomly show icon
+                    if random.random() < ICON_PROBABILITY:
+                        show_random_icon()
+
+        time.sleep(0.025)
+        canvas = matrix.SwapOnVSync(canvas)
+
+
 class RunText(SampleBase):
     def __init__(self, *args, **kwargs):
         super(RunText, self).__init__(*args, **kwargs)
         self.parser.add_argument("-t", "--text", help="The text to scroll on the RGB LED panel", default="Hello world!")
 
     def run(self):
-        global message_pos, messages, message, alert_pos, message_index, daddy_sleeping, icon_pos
-
-        offscreen_canvas = self.matrix.CreateFrameCanvas()
-
-        time_font = graphics.Font()
-        time_font.LoadFont("../fonts/7x13.bdf")
-
-        font = graphics.Font()
-        # font.LoadFont("../fonts/clR6x12.bdf")
-        font.LoadFont("../fonts/6x13.bdf")
-        message_pos = CANVAS_WIDTH
-
-        alert_font = graphics.Font()
-        alert_font.LoadFont("../fonts/7x13B.bdf")
-        alert_pos = CANVAS_WIDTH
-
-        message_thread = threading.Thread(target=get_messages, daemon=True)
-        message_thread.start()
-
-        while True:
-            offscreen_canvas.Clear()
-            now = datetime.now()
-
-            unix_time = now.timestamp()
-
-            alert_to_render = None
-            with alert_lock:
-                alert_to_render = alert
-
-            with internet_lock:
-                if no_internet_message:
-                    if alert_to_render:
-                        alert_to_render = f"{alert_to_render}    {no_internet_message}"
-                    else:
-                        alert_to_render = no_internet_message
-
-            if icon_pos > -32:
-                offscreen_canvas.SetImage(icon.image, icon_pos)
-                icon_pos -= 1
-
-            elif alert_to_render:
-                if (int(unix_time) % 2) == 0:
-                    graphics.DrawLine(offscreen_canvas, 0, 0, CANVAS_WIDTH, 0, ALERT_COLOUR)
-                    graphics.DrawLine(offscreen_canvas, 0, 1, CANVAS_WIDTH, 1, ALERT_COLOUR)
-                    graphics.DrawLine(offscreen_canvas, 0, CANVAS_HEIGHT - 2, CANVAS_WIDTH, CANVAS_HEIGHT - 2, ALERT_COLOUR)
-                    graphics.DrawLine(offscreen_canvas, 0, CANVAS_HEIGHT - 1, CANVAS_WIDTH, CANVAS_HEIGHT - 1, ALERT_COLOUR)
-
-                length = graphics.DrawText(offscreen_canvas, alert_font, alert_pos, 20, ALERT_COLOUR, alert_to_render)
-                alert_pos -= 1
-                if (alert_pos + length < 0):
-                    alert_pos = CANVAS_WIDTH
-
-            else:
-                time_str = now.strftime("%H:%M:%S")
-
-                graphics.DrawText(offscreen_canvas, time_font, 4, 11, CLOCK_COLOUR, time_str)
-
-                if daddy_sleeping:
-                    graphics.DrawLine(offscreen_canvas, 0, CANVAS_HEIGHT - 2, CANVAS_WIDTH, CANVAS_HEIGHT - 2, SLEEPING_UNDERLINE_COLOUR)
-
-                if internet_failover:
-                    for i in range(3):
-                        graphics.DrawLine(offscreen_canvas, CANVAS_WIDTH - 3, CANVAS_HEIGHT - 1 - i, CANVAS_WIDTH, CANVAS_HEIGHT - 1 - i, INTERNET_FAILOVER_COLOUR)
-
-                # If no message is loaded, try to load one
-                if message is None:
-                    message_index = 0
-                    if messages:
-                        message = messages[0]
-
-                # If we have a message
-                if message:
-                    length = graphics.DrawText(offscreen_canvas, font, message_pos, 26, message.colour, message.text)
-
-                    message_pos -= 1
-                    if (message_pos + length + 10 < 0):
-                        message_pos = CANVAS_WIDTH
-                        message_index += 1
-                        with message_lock:
-                            if message_index >= len(messages):
-                                message_index = 0
-                            message = messages[message_index]
-
-                        # Randomly show icon
-                        if random.random() < ICON_PROBABILITY:
-                            show_random_icon()
-
-            time.sleep(0.025)
-            offscreen_canvas = self.matrix.SwapOnVSync(offscreen_canvas)
+        main(self.matrix)
 
 
-# Main function
+# Program entry point
 if __name__ == "__main__":
     logging.basicConfig(
         level=logging.INFO,
