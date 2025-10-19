@@ -89,6 +89,7 @@ icons = [
     Icon("core-x", "X Parasites!"),
     Icon("oddish", "Oddish oddish!"),
     Icon("ultros", "Yeowch! Seafood soup!"),
+    Icon("eye", "Eye of Cthulhu!"),
 ]
 
 for icon in icons:
@@ -233,7 +234,7 @@ def render_time(canvas, now):
 
     hour = now.hour
     pm = hour >= 12
-    
+
     # Render the hour
     if hour > 12 and not TIME_FORMAT_24_HOUR:
         hour -= 12
@@ -257,7 +258,7 @@ def render_time(canvas, now):
     x += FONT_W * 2
     graphics.DrawText(canvas, time_font, x + 1, y, CLOCK_COLOUR, ":")
     x += FONT_W
-    
+
     # Seconds
     sec_str = str(now.second)
     if len(sec_str) == 1:
